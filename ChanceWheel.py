@@ -1,81 +1,94 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QMessageBox
-from PyQt5.QtMultimediaWidgets import QVideoWidget
-from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtCore import QSize, QUrl
+import math
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout
+from PyQt5.QtCore import Qt, QTimer,QPoint
+from PyQt5.QtGui import QPainter, QColor,QPolygonF
+import random
 
-def is_prime(n):
-    if n <= 1:
-        return False
-    elif n <= 3:
-        return True
-    elif n % 2 == 0 or n % 3 == 0:
-        return False
-    i = 5
-    while i * i <= n:
-        if n % i == 0 or n % (i + 2) == 0:
-            return False
-        i += 6
-    return True
+class SpinWheel(QWidget):
+    def __init__(self, parent=None):
+        super(SpinWheel, self).__init__(parent)
+        self.setMinimumSize(300, 300)
 
-class PrimeNumberChecker(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle('Prime Number Checker')
-        self.setGeometry(100, 100, 300, 200)
+        self.colors = [
+            QColor(Qt.red),
+            QColor(Qt.green),
+            QColor(Qt.blue),
+            QColor(Qt.yellow),
+            QColor(Qt.cyan),
+            QColor(Qt.magenta),
+            QColor(Qt.darkCyan)
+        ]
+        self.current_angle = 0
+        self.animation_steps = 100
+        self.animation_interval = 20
+        self.target_angle = 0
+        self.animation_timer = QTimer(self)
+        self.animation_timer.timeout.connect(self.animate)
+        self.animation_timer.setInterval(self.animation_interval)
 
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
+        self.spin_button = QPushButton("Spin")
+        self.spin_button.clicked.connect(self.start_spin)
 
-        self.layout = QVBoxLayout()
-        self.central_widget.setLayout(self.layout)
+        layout = QVBoxLayout()
+        layout.addWidget(self.spin_button)
+        layout.addStretch()
+        self.spin_button.setGeometry(0,0,20,20)
+        self.setLayout(layout)
 
-        self.label = QLabel('Enter a number:')
-        self.layout.addWidget(self.label)
+    def start_spin(self):
+        self.animation_steps = 100  # Reset animation steps
+        num_rotations = random.randint(3, 12)
+        self.target_angle = num_rotations * 360 + random.randint(0, 359)  # Increment target angle
+        self.animation_timer.start()
+      
+    def animate(self):
+        if self.animation_steps > 0:
+            self.current_angle += (self.target_angle - self.current_angle) / self.animation_steps
+            self.animation_steps -= 1
+            self.update()
+        else:
+            self.animation_timer.stop()
+            self.current_angle %= 360
+            self.current_angle = round(self.current_angle, 2)
 
-        self.number_input = QLineEdit()
-        self.layout.addWidget(self.number_input)
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.TextAntialiasing)
 
-        self.check_button = QPushButton('Check')
-        self.check_button.clicked.connect(self.check_number)
-        self.layout.addWidget(self.check_button)
+        size = min(self.width(), self.height())
+        wheel_radius = size / 2 - 10
 
-        self.help_button = QPushButton('Help')
-        self.help_button.clicked.connect(self.show_help)
-        self.layout.addWidget(self.help_button)
+        painter.translate(self.width() / 2, self.height() / 2)
+        painter.rotate(self.current_angle)
 
-        self.result_label = QLabel()
-        self.layout.addWidget(self.result_label)
+        for i, color in enumerate(self.colors):
+            angle = 360 / len(self.colors)
+            painter.setBrush(color)
+            painter.drawPie(int(-wheel_radius), int(-wheel_radius), int(2 * wheel_radius), int(2 * wheel_radius),
+                            int(i * angle * 16), int(angle * 16))
+        # Draw pointer
+        pointer_length = wheel_radius * 0.5  # Adjust pointer length
+        pointer_angle = -self.current_angle
+        pointer_p1 = QPoint(0, 0)
+        pointer_p2 = QPoint(int(pointer_length * math.cos(math.radians(pointer_angle))),
+                            int(pointer_length * math.sin(math.radians(pointer_angle))))
+        pointer_p3 = QPoint(int((pointer_length - 3) * math.cos(math.radians(pointer_angle + 10))),
+                            int((pointer_length - 5) * math.sin(math.radians(pointer_angle + 10))))
 
-        # Add video player
-        self.video_widget = QVideoWidget()
-        self.layout.addWidget(self.video_widget)
+        pointer_polygon = QPolygonF([pointer_p1, pointer_p2, pointer_p3])
+        painter.setBrush(Qt.black)
+        painter.drawPolygon(pointer_polygon)
 
-        self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
-        self.media_player.setVideoOutput(self.video_widget)
+if __name__ == "__main__":
+    import random
 
-    def check_number(self):
-        number = self.number_input.text()
-        try:
-            number = int(number)
-            if is_prime(number):
-                self.result_label.setText(f'{number} is a prime number.')
-            else:
-                self.result_label.setText(f'{number} is not a prime number.')
-        except ValueError:
-            self.result_label.setText('Please enter a valid number.')
-
-    def show_help(self):
-        message_box = QMessageBox()
-        message_box.setWindowTitle('Help - Prime Numbers')
-        message_box.setText('A prime number is a natural number greater than 1 that has no positive divisors other than 1 and itself.')
-        message_box.exec()
-
-if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = PrimeNumberChecker()
+    window = QWidget()
+    layout = QVBoxLayout()
+    spin_wheel = SpinWheel()
+    layout.addWidget(spin_wheel)
+    window.setLayout(layout)
     window.show()
     sys.exit(app.exec_())
-
-  
-
